@@ -5,11 +5,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import it.polito.tdp.extflightdelays.model.Airline;
 import it.polito.tdp.extflightdelays.model.Airport;
+import it.polito.tdp.extflightdelays.model.CoppiaAirport;
 import it.polito.tdp.extflightdelays.model.Flight;
 
 public class ExtFlightDelaysDAO {
@@ -90,5 +93,46 @@ public class ExtFlightDelaysDAO {
 			System.out.println("Errore connessione al database");
 			throw new RuntimeException("Error Connection Database");
 		}
+	}
+	
+	public Set<CoppiaAirport> getAverageDistances() {
+		
+		String sql = "SELECT ORIGIN_AIRPORT_ID, DESTINATION_AIRPORT_ID, AVG(DISTANCE) AS distanzaMedia, COUNT(*) AS numeroVoli "
+				+ "FROM flights "
+				+ "GROUP BY ORIGIN_AIRPORT_ID, DESTINATION_AIRPORT_ID";
+		
+		Set<CoppiaAirport> set = new HashSet<CoppiaAirport>();
+		
+		Connection conn = ConnectDB.getConnection();
+		try {
+			PreparedStatement st = conn.prepareStatement(sql);
+			ResultSet res = st.executeQuery();
+			while(res.next()) {
+				CoppiaAirport coppia = new CoppiaAirport(res.getInt("ORIGIN_AIRPORT_ID"),
+						res.getInt("DESTINATION_AIRPORT_ID"),
+						res.getDouble("distanzaMedia"),
+						res.getInt("numeroVoli"));
+				
+				if(set.contains(coppia)) {
+					for(CoppiaAirport ca : set) {
+						if(ca.equals(coppia)) {
+							ca.setDistanzaMedia( (ca.getDistanzaMedia()*ca.getNumeroVoli() +coppia.getDistanzaMedia()*coppia.getNumeroVoli() )/ (ca.getNumeroVoli()+coppia.getNumeroVoli()) );
+							ca.setNumeroVoli(ca.getNumeroVoli()+coppia.getNumeroVoli());
+							break;
+						}
+					}
+				}else {
+					set.add(coppia);
+				}
+			}
+			
+			conn.close();
+			return set;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			System.out.println("Errore connessione al database");
+			throw new RuntimeException("Error Connection Database");
+		}
+		
 	}
 }
